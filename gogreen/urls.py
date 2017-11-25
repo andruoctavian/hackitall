@@ -18,6 +18,7 @@ from django.contrib import admin
 
 urlpatterns = [
     url(r'^googleapis/', include('googleapis.urls')),
-    url(r'^route/', include('RouteApp.urls')),
     url(r'^admin/', admin.site.urls),
+    url(r'^auth/', include('AuthApp.urls')),
+    url(r'^route/', include('RouteApp.urls')),
 ]

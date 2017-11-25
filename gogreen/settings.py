@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'googleapis',
     'RouteApp',
+    'AuthApp',
 ]
 
 MIDDLEWARE = [
@@ -126,6 +127,10 @@ USE_TZ = True
 STATIC_URL = '/static/'
 
 CORS_ORIGIN_ALLOW_ALL = True
+
+SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
+
+SESSION_COOKIE_HTTPONLY = False
 
 # Parameters
 GOOGLE_API_URL = 'https://maps.googleapis.com/maps/api/directions/json'
