@@ -19,7 +19,7 @@ LAST_NAME_KEY = 'last_name'
 
 @csrf_exempt
 def signup_action(request):
-    if request.user.is_authenticated():
+    if is_authenticated(request):
         return fail_response('A user is already authenticated.')
     if not request_is_post(request):
         return fail_response('Expected POST request, received ' + request.method + '.')
@@ -64,7 +64,7 @@ def signup_action(request):
 
 @csrf_exempt
 def login_action(request):
-    if request.user.is_authenticated():
+    if is_authenticated(request):
         return fail_response('A user is already authenticated.')
     if not request_is_post(request):
         return fail_response('Expected POST request, received ' + request.method + '.')
@@ -89,7 +89,7 @@ def login_action(request):
 
 @csrf_exempt
 def logout_action(request):
-    if not request.user.is_authenticated():
+    if not is_authenticated(request):
         return fail_response('There is no user authenticated.')
     try:
         logout(request)
@@ -97,3 +97,11 @@ def logout_action(request):
         return fail_response('Unexpected error while logging out.')
 
     return success_response('User logged out.')
+
+
+@csrf_exempt
+def check_action(request):
+    if not is_authenticated(request):
+        return fail_response('There is no user authenticated.')
+
+    return success_response('User is Logged in.')
