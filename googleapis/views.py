@@ -15,7 +15,7 @@ from gogreen import settings
 def index(request):
     origin = request.GET.get('origin', '')
     destination = request.GET.get('destination', '')
-    api_response = get(settings.GOOGLE_API_URL, params={
+    api_response = get(settings.GOOGLE_API_DIRECTION_URL, params={
         'key': settings.GOOGLE_API_KEY,
         'origin': 'Bucharest',
         'destination': 'Focsani',

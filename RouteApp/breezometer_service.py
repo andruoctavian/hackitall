@@ -9,7 +9,7 @@ import math
 from .api_service import *
 
 ONE_KILOMETER = 1000
-TEN_KILOMETERS = 10000
+FIVE_KILOMETERS = 5000
 TOTAL_DISTANCE = 0
 MATRIX_SIZE = 5
 
@@ -43,10 +43,10 @@ class MyThread(threading.Thread):
             mat[point['i']][point['j']] = 100
 
     def run(self):
-        r = call_breezometer(str(self.point1['lat']), str(self.point1['lon']))
+        r = call_breezometer(str(self.point1['lat']), str(self.point1['lon']), 'breezometer_aqi')
         self.set_matrix(r.json(), self.point1)
         if self.point2 is not None:
-            r = call_breezometer(str(self.point2['lat']), str(self.point2['lon']))
+            r = call_breezometer(str(self.point2['lat']), str(self.point2['lon']), 'breezometer_aqi')
             self.set_matrix(r.json(), self.point2)
 
 
@@ -74,11 +74,11 @@ def breezometer_route(google_response, grade):
 
     if start_lat == end_lat and start_lon == end_lon:
         return list()
-
+    print('Distance:' + str(distance))
     global MATRIX_SIZE
     if distance < ONE_KILOMETER:
         MATRIX_SIZE = 3
-    elif distance < TEN_KILOMETERS:
+    elif distance < FIVE_KILOMETERS:
         MATRIX_SIZE = 4
 
     global TOTAL_DISTANCE
@@ -239,3 +239,8 @@ def dijkstra(visited, cur_x, cur_y, slider, total_dist, points):
                 sel_j = j
     if not len(visited) == (MATRIX_SIZE * MATRIX_SIZE):
         dijkstra(visited, sel_i, sel_j, slider, total_dist, points)
+
+
+def get_local_air_quality(lat, lon):
+    r = call_breezometer(str(lat), str(lon), 'breezometer_description,breezometer_color,dominant_pollutant_text,breezometer_aqi')
+    return r.json()
