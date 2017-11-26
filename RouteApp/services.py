@@ -8,7 +8,7 @@ def adapt_google(way_points):
     google_formatted = []
     for way_point in way_points:
         google_formatted.append({
-            LOCATION_KEY: str(way_point[1]) + ',' + str(way_point[0]),
+            LOCATION_KEY: str(way_point[0]) + ',' + str(way_point[1]),
             STOPOVER_KEY: True
         })
 
@@ -20,3 +20,12 @@ def check_google_response(google_response):
         return False
 
     return True
+
+
+def adapt_invert(coordinates):
+    if coordinates is None:
+        return None
+
+    coord1, coord2 = coordinates.split(",")
+
+    return coord2 + "," + coord1

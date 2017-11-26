@@ -1,19 +1,22 @@
 from __future__ import print_function
-
-import json
 import requests
 import threading
 import datetime
+import math
 
 from gogreen.settings import *
 
+ONE_KILOMETER = 1000
+TEN_KILOMETERS = 10000
+TOTAL_DISTANCE = 0
+MATRIX_SIZE = 5
 
-w, h = 5, 5
+w, h = MATRIX_SIZE, MATRIX_SIZE
 mat = [[0 for x in range(w)] for y in range(h)]
 
 dist = [[0 for x in range(w)] for y in range(h)]
-for i in range(0, 5):
-    for j in range(0, 5):
+for i in range(0, MATRIX_SIZE):
+    for j in range(0, MATRIX_SIZE):
         dist[i][j] = 99999
 dist[0][0] = 0
 
@@ -32,7 +35,7 @@ class MyThread(threading.Thread):
         if 'breezometer_aqi' in res:
             mat[point['i']][point['j']] = res['breezometer_aqi']
         else:
-            mat[point['i']][point['j']] = '100'
+            mat[point['i']][point['j']] = 100
 
     def run(self):
         r = requests.get('https://api.breezometer.com/baqi/?lat=' + str(self.point1['lat']) + '&lon=' + str(self.point1['lon']) + '&key=' + BREEZOMETER_API_KEY +
@@ -46,9 +49,9 @@ class MyThread(threading.Thread):
             self.set_matrix(r.json(), self.point2)
 
 
-def print_5x5(this_mat):
-    for i in range(0, 5):
-        for j in range(0, 5):
+def print_mat(this_mat, size):
+    for i in range(0, size):
+        for j in range(0, size):
             print(str(this_mat[i][j]) + ' ', end='')
 
         print('')
@@ -58,27 +61,36 @@ def get_time():
     return str(datetime.datetime.now())
 
 
-def breezometer_route(google_response):
+def breezometer_route(google_response, grade):
     start_lat = google_response['routes'][0]['legs'][0]['start_location']['lat']
     start_lon = google_response['routes'][0]['legs'][0]['start_location']['lng']
     end_lat = google_response['routes'][0]['legs'][0]['end_location']['lat']
     end_lon = google_response['routes'][0]['legs'][0]['end_location']['lng']
     print('Start: ' + str(google_response["routes"][0]["legs"][0]['start_location']))
     print('End: ' + str(google_response["routes"][0]["legs"][0]['end_location']))
+    distance = google_response['routes'][0]['legs'][0]['distance']['value']
+    global MATRIX_SIZE
+    if distance < ONE_KILOMETER:
+        MATRIX_SIZE = 3
+    elif distance < TEN_KILOMETERS:
+        MATRIX_SIZE = 4
+
+    global TOTAL_DISTANCE
+    TOTAL_DISTANCE = get_distance(start_lat, start_lon, end_lat, end_lon)
 
     # Calculate matrix points
     print('Calculating matrix ' + get_time())
-    lat_dist = (end_lat - start_lat) * 0.25
-    lon_dist = (end_lon - start_lon) * 0.25
+    lat_dist = (end_lat - start_lat) * (1.0 / (MATRIX_SIZE - 1))
+    lon_dist = (end_lon - start_lon) * (1.0 / (MATRIX_SIZE - 1))
 
     print('Lat: ' + str(lat_dist))
     print('Lon: ' + str(lon_dist))
     t_lat = start_lat
 
     points = list()
-    for i in range(0, 5):
+    for i in range(0, MATRIX_SIZE):
         t_lon = start_lon
-        for j in range(0, 5):
+        for j in range(0, MATRIX_SIZE):
             points.append({'lat': t_lat,
                            'lon': t_lon,
                            'i': i,
@@ -92,9 +104,13 @@ def breezometer_route(google_response):
     print('Setting threads: ' + get_time())
     all_threads = list()
 
-    for i in range(0, len(points) - 1, 2):
-        all_threads.append(MyThread(points[i], points[i+1]))
-    all_threads.append(MyThread(points[24], None))
+    if len(points) % 2 == 0:
+        for i in range(0, len(points), 2):
+            all_threads.append(MyThread(points[i], points[i+1]))
+    else:
+        for i in range(0, len(points) - 1, 2):
+            all_threads.append(MyThread(points[i], points[i+1]))
+        all_threads.append(MyThread(points[len(points) - 1], None))
 
     for th in all_threads:
         th.start()
@@ -104,24 +120,24 @@ def breezometer_route(google_response):
 
     print('Done: ' + get_time())
     print('1: Extracted mat:')
-    print_5x5(mat)
+    print_mat(mat, MATRIX_SIZE)
 
     dist[0][0] = mat[0][0]
-    dijkstra(list(), 0, 0)
+    print_mat(dist, MATRIX_SIZE)
+    dijkstra(list(), 0, 0, grade, TOTAL_DISTANCE, points)
     print('2: Dijkstra distances')
-    print_5x5(dist)
+    print_mat(dist, MATRIX_SIZE)
     print('3: Dijkstra prevs')
-    print_5x5(prev)
+    print_mat(prev, MATRIX_SIZE)
 
     shortest_path = list()
     shortest_path_values = list()
     shortest_path_latlon = list()
 
-    i = 4
-    j = 4
+    i = MATRIX_SIZE - 1
+    j = MATRIX_SIZE - 1
     shortest_path.append([i, j])
     shortest_path_values.append(mat[i][j])
-    shortest_path_latlon.append([points[i * 5 + j]['lat'], points[i * 5 + j]['lon']])
     while 1:
         shortest_path.append(prev[i][j])
         prev_i = i
@@ -129,9 +145,9 @@ def breezometer_route(google_response):
         i = prev[prev_i][prev_j][0]
         j = prev[prev_i][prev_j][1]
         shortest_path_values.append(mat[i][j])
-        shortest_path_latlon.append([points[i * 5 + j]['lat'], points[i * 5 + j]['lon']])
         if i == 0 and j == 0:
             break
+        shortest_path_latlon.append([points[i * MATRIX_SIZE + j]['lat'], points[i * MATRIX_SIZE + j]['lon']])
 
     shortest_path = list(reversed(shortest_path))
     shortest_path_values = list(reversed(shortest_path_values))
@@ -151,53 +167,66 @@ def list_append(lst, item):
     return lst
 
 
-def dijkstra(visited, cur_x, cur_y):
+def get_distance(point1_x, point1_y, point2_x, point2_y):
+    return math.sqrt(math.pow((point1_x - point2_x), 2) + math.pow((point1_y - point2_y), 2))
+
+
+def get_distance_points(point1_x, point1_y, point2_x, point2_y, points):
+    return get_distance(points[point1_x * MATRIX_SIZE + point1_y]['lat'], points[point1_x * MATRIX_SIZE + point1_y]['lon'], points[point2_x * MATRIX_SIZE + point2_y]['lat'], points[point2_x * MATRIX_SIZE + point2_y]['lon'])
+
+
+def complex_formula(slider, cur_x_1, cur_y_1, cur_x_2, cur_y_2, total_distance, total, points):
+    return (100 - slider) * get_distance_points(cur_x_1, cur_y_1, cur_x_2, cur_y_2, points) / total_distance + ((slider * (total + mat[cur_x_2][cur_y_2])) / 100)
+
+
+def dijkstra(visited, cur_x, cur_y, slider, total_dist, points):
     visited.append([cur_x, cur_y])
 
     total = dist[cur_x][cur_y]
-    if cur_x + 1 < 5 and dist[cur_x + 1][cur_y] > total + mat[cur_x + 1][cur_y]:
-        dist[cur_x + 1][cur_y] = total + mat[cur_x + 1][cur_y]
+    print('Total: ' + str(total))
+    if cur_x + 1 < MATRIX_SIZE and dist[cur_x + 1][cur_y] > complex_formula(slider, cur_x, cur_y, cur_x + 1, cur_y, total_dist, total, points):
+        dist[cur_x + 1][cur_y] = complex_formula(slider, cur_x, cur_y, cur_x + 1, cur_y, TOTAL_DISTANCE, total, points)
         prev[cur_x + 1][cur_y] = [cur_x, cur_y]
 
-    if cur_y + 1 < 5 and dist[cur_x][cur_y + 1] > total + mat[cur_x][cur_y + 1]:
-        dist[cur_x][cur_y + 1] = total + mat[cur_x][cur_y + 1]
+    if cur_y + 1 < MATRIX_SIZE and dist[cur_x][cur_y + 1] > complex_formula(slider, cur_x, cur_y, cur_x, cur_y + 1, total_dist, total, points):
+        dist[cur_x][cur_y + 1] = complex_formula(slider, cur_x, cur_y, cur_x, cur_y + 1, TOTAL_DISTANCE, total, points)
         prev[cur_x][cur_y + 1] = [cur_x, cur_y]
 
-    if cur_x - 1 >= 0 and dist[cur_x - 1][cur_y] > total + mat[cur_x - 1][cur_y]:
-        dist[cur_x - 1][cur_y] = total + mat[cur_x - 1][cur_y]
+    if cur_x - 1 >= 0 and dist[cur_x - 1][cur_y] > complex_formula(slider, cur_x, cur_y, cur_x - 1, cur_y, total_dist, total, points):
+        dist[cur_x - 1][cur_y] = complex_formula(slider, cur_x, cur_y, cur_x - 1, cur_y, TOTAL_DISTANCE, total, points)
         prev[cur_x - 1][cur_y] = [cur_x, cur_y]
 
-    if cur_y - 1 >= 0 and dist[cur_x][cur_y - 1] > total + mat[cur_x][cur_y - 1]:
-        dist[cur_x][cur_y - 1] = total + mat[cur_x][cur_y - 1]
+    if cur_y - 1 >= 0 and dist[cur_x][cur_y - 1] > complex_formula(slider, cur_x, cur_y, cur_x, cur_y - 1, total_dist, total, points):
+        dist[cur_x][cur_y - 1] = complex_formula(slider, cur_x, cur_y, cur_x, cur_y - 1, TOTAL_DISTANCE, total, points)
         prev[cur_x][cur_y - 1] = [cur_x, cur_y]
 
     # Diagonals
-    if cur_x + 1 < 5 and cur_y + 1 < 5 and dist[cur_x + 1][cur_y + 1] > total + mat[cur_x + 1][cur_y + 1]:
-        dist[cur_x + 1][cur_y + 1] = total + mat[cur_x + 1][cur_y + 1]
+    if cur_x + 1 < MATRIX_SIZE and cur_y + 1 < MATRIX_SIZE and dist[cur_x + 1][cur_y + 1] > complex_formula(slider, cur_x, cur_y, cur_x + 1, cur_y + 1, total_dist, total, points):
+        dist[cur_x + 1][cur_y + 1] = complex_formula(slider, cur_x, cur_y, cur_x + 1, cur_y + 1, TOTAL_DISTANCE, total, points)
         prev[cur_x + 1][cur_y + 1] = [cur_x, cur_y]
 
-    if cur_x + 1 < 5 and cur_y - 1 >= 0 and dist[cur_x + 1][cur_y - 1] > total + mat[cur_x + 1][cur_y - 1]:
-        dist[cur_x + 1][cur_y - 1] = total + mat[cur_x + 1][cur_y - 1]
+    if cur_x + 1 < MATRIX_SIZE and cur_y - 1 >= 0 and dist[cur_x + 1][cur_y - 1] > complex_formula(slider, cur_x, cur_y, cur_x + 1, cur_y - 1, total_dist, total, points):
+        dist[cur_x + 1][cur_y - 1] = complex_formula(slider, cur_x, cur_y, cur_x + 1, cur_y - 1, TOTAL_DISTANCE, total, points)
         prev[cur_x + 1][cur_y - 1] = [cur_x, cur_y]
 
-    if cur_x - 1 >= 0 and cur_y - 1 >= 0 and dist[cur_x - 1][cur_y - 1] > total + mat[cur_x - 1][cur_y - 1]:
-        dist[cur_x - 1][cur_y - 1] = total + mat[cur_x - 1][cur_y - 1]
+    if cur_x - 1 >= 0 and cur_y - 1 >= 0 and dist[cur_x - 1][cur_y - 1] > complex_formula(slider, cur_x, cur_y, cur_x - 1, cur_y - 1, total_dist, total, points):
+        dist[cur_x - 1][cur_y - 1] = complex_formula(slider, cur_x, cur_y, cur_x - 1, cur_y - 1, TOTAL_DISTANCE, total, points)
         prev[cur_x - 1][cur_y - 1] = [cur_x, cur_y]
 
-    if cur_x - 1 >= 0 and cur_y + 1 < 5 and dist[cur_x - 1][cur_y + 1] > total + mat[cur_x - 1][cur_y + 1]:
-        dist[cur_x - 1][cur_y + 1] = total + mat[cur_x - 1][cur_y + 1]
+    if cur_x - 1 >= 0 and cur_y + 1 < MATRIX_SIZE and dist[cur_x - 1][cur_y + 1] > complex_formula(slider, cur_x, cur_y, cur_x - 1, cur_y + 1, total_dist, total, points):
+        dist[cur_x - 1][cur_y + 1] = complex_formula(slider, cur_x, cur_y, cur_x - 1, cur_y + 1, TOTAL_DISTANCE, total, points)
         prev[cur_x - 1][cur_y + 1] = [cur_x, cur_y]
 
     # Get min value not visited
     min = 99999
     sel_i = -1
     sel_j = -1
-    for i in range(0, 5):
-        for j in range(0, 5):
+    for i in range(0, MATRIX_SIZE):
+        for j in range(0, MATRIX_SIZE):
             if [i, j] not in visited and dist[i][j] < min:
                 min = dist[i][j]
                 sel_i = i
                 sel_j = j
 
-    if not len(visited) == 25:
-        dijkstra(visited, sel_i, sel_j)
+    if not len(visited) == (MATRIX_SIZE * MATRIX_SIZE):
+        dijkstra(visited, sel_i, sel_j, slider, total_dist, points)
