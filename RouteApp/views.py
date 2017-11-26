@@ -13,6 +13,7 @@ ORIGIN_KEY = 'origin'
 DESTINATION_KEY = 'destination'
 MODE_KEY = 'mode'
 MODE_DRIVING = 'driving'
+PARK_KEY = 'park'
 
 
 @csrf_exempt
@@ -30,15 +31,27 @@ def directions_action(request, green_index):
 
     mode = request.GET.get(MODE_KEY, MODE_DRIVING)
 
+    park = request.GET.get(PARK_KEY, None)
+    if park is not None:
+        coordinates = origin.split(",")
+        google_response = call_google_place(coordinates[0], coordinates[1], 'park')
+        park = get_closest_place(coordinates[0], coordinates[1], google_response)
+        park = [{
+            LOCATION_KEY: str(park[LATITUDE_KEY]) + ',' + str(park['lng']),
+            STOPOVER_KEY: True,
+        }]
+    else:
+        park = []
+
     if int(green_index) == 0:
-        return JsonResponse([], safe=False)
+        return JsonResponse(park, safe=False)
 
     google_response = call_google_direction(origin, destination, mode)
     if not check_google_response(google_response):
         return fail_response('No routes were found.')
 
-    way_points = breezometer_route(google_response,int(green_index))
-    way_points = adapt_google(way_points)
+    way_points = breezometer_route(google_response, int(green_index))
+    way_points = park + adapt_google(way_points)
 
     return JsonResponse(way_points, safe=False)
 
