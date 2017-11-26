@@ -1,7 +1,6 @@
 
 LOCATION_KEY = 'location'
 STOPOVER_KEY = 'stopover'
-ROUTES_KEY = 'routes'
 
 
 def adapt_google(way_points):
@@ -13,13 +12,6 @@ def adapt_google(way_points):
         })
 
     return google_formatted
-
-
-def check_google_response(google_response):
-    if len(google_response[ROUTES_KEY]) == 0:
-        return False
-
-    return True
 
 
 def adapt_invert(coordinates):

@@ -137,4 +137,5 @@ CORS_ORIGIN_ALLOW_ALL = True
 GOOGLE_API_URL = 'https://maps.googleapis.com/maps/api/directions/json'
 GOOGLE_API_KEY = 'AIzaSyD15hymjYkNwzo0b3tygZorhv6fA-SuOzs'
 
+BREEZOMETER_API_URL = 'https://api.breezometer.com/baqi/'
 BREEZOMETER_API_KEY = 'de4fef0f7fb349f29f3f21c275018069'

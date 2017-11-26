@@ -1,15 +1,12 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-from json import loads
 from django.views.decorators.csrf import csrf_exempt
-from requests import get
 
 from gogreen.services import *
-from gogreen.settings import *
 from AuthApp.services import is_authenticated
 from .services import *
-from.breezometer_service import breezometer_route
+from .breezometer_service import breezometer_route
 
 ORIGIN_KEY = 'origin'
 DESTINATION_KEY = 'destination'
@@ -35,14 +32,7 @@ def directions(request, green_index):
     if int(green_index) == 0:
         return JsonResponse([], safe=False)
 
-    api_response = get(GOOGLE_API_URL, params={
-        'key': GOOGLE_API_KEY,
-        ORIGIN_KEY: origin,
-        DESTINATION_KEY: destination,
-        MODE_KEY: mode,
-    })
-
-    google_response = loads(api_response.content)
+    google_response = call_google(origin, destination, mode)
     if not check_google_response(google_response):
         return fail_response('No routes were found.')
 

@@ -105,3 +105,15 @@ def check_action(request):
         return fail_response('There is no user authenticated.')
 
     return success_response('User is Logged in.')
+
+
+@csrf_exempt
+def user_action(request):
+    if not is_authenticated(request):
+        return fail_response('There is no user authenticated.')
+
+    user = get_user(request)
+    if user is None:
+        return fail_response('Error while trying to get user info.')
+
+    return success_response(serialize_user(user))
